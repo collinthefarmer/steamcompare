@@ -13,10 +13,11 @@ def get_prices(appids):
     resp = requests.get(
         f"https://store.steampowered.com/api/appdetails/?appids={','.join(appids)}&cc=us&filters=price_overview")
     return [
-        v["data"]
-            .get("price_overview", {})
-            .get("final_formatted")
-        for v in resp.json().values()
+        (k, v["data"]
+         .get("price_overview", {})
+         .get("final_formatted"),
+         )
+        for k, v in resp.json().items()
         if v["success"]
            and isinstance(v["data"], dict)
     ]
@@ -55,7 +56,7 @@ def main(writer, api_key, ids):
     game_set = list(set(g for games in user_games.values() for g in games))
     game_prices = {}
     for game_chunk in chunks(game_set, 100):
-        game_prices.update({game[0]: p for game, p in zip(game_chunk, get_prices([str(g[0]) for g in game_chunk]))})
+        game_prices.update({p[0]: p[1] for p in get_prices([str(g[0]) for g in game_chunk])})
 
     ownership = [[
         gid,
@@ -63,12 +64,13 @@ def main(writer, api_key, ids):
     ] for gid in game_set]
 
     exportable = [
-        [r[0][1], game_prices.get(r[0][0], "???"), *r[1]]
+        [r[0][1], game_prices.get(str(r[0][0]), "???"), *r[1]]
         for r in ownership
     ]
 
     writer.writerows([
-        ["Game Name", "Current Price", *[f"{user['personaname']} ({user.get('realname', 'Mr. Mystery')}) owns" for user in users]]
+        ["Game Name", "Current Price",
+         *[f"{user['personaname']} ({user.get('realname', 'Mr. Mystery')}) owns" for user in users]]
     ])
     writer.writerows(exportable)
 
